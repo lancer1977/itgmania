@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
+#include <ctime>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -30,6 +32,7 @@
 #include "PrefsManager.h"
 #include "Profile.h"
 #include "ProfileManager.h"
+#include "ProductInfo.h"
 #include "RageLog.h"
 #include "RageUtil.h"
 #include "RageUtil/RandomNumbers.h"
@@ -46,6 +49,7 @@
 #include "ThemeManager.h"
 #include "ThemeMetric.h"
 #include "global.h"
+#include "ver.h"
 
 // metrics that are common to all ScreenEvaluation classes
 #define BANNER_WIDTH THEME->GetMetricF(m_sName, "BannerWidth")
@@ -97,6 +101,112 @@ static const int NUM_SHOWN_RADAR_CATEGORIES = 5;
 AutoScreenMessage(SM_PlayCheer);
 
 REGISTER_SCREEN_CLASS(ScreenEvaluation);
+
+namespace {
+std::string JsonEscape(const std::string& value) {
+  std::string escaped;
+  escaped.reserve(value.size() + 8);
+  for (char ch : value) {
+    switch (ch) {
+      case '\\':
+        escaped += "\\\\";
+        break;
+      case '"':
+        escaped += "\\\"";
+        break;
+      case '\n':
+        escaped += "\\n";
+        break;
+      case '\r':
+        escaped += "\\r";
+        break;
+      case '\t':
+        escaped += "\\t";
+        break;
+      default:
+        escaped += ch;
+        break;
+    }
+  }
+  return escaped;
+}
+
+std::string PipelineEventFilePath(const std::string& eventDir) {
+  time_t now = time(nullptr);
+  tm utc;
+#if defined(_WIN32)
+  gmtime_s(&utc, &now);
+#else
+  gmtime_r(&now, &utc);
+#endif
+  char date[16];
+  strftime(date, sizeof(date), "%Y%m%d", &utc);
+
+  std::string path = eventDir;
+  if (!path.empty() && path.back() != '/' && path.back() != '\\') {
+    path += "/";
+  }
+  path += "events-";
+  path += date;
+  path += ".jsonl";
+  return path;
+}
+
+PlayerNumber FirstPipelineResultPlayer() {
+  FOREACH_EnabledPlayer(p) { return p; }
+  return PLAYER_1;
+}
+
+void EmitPipelineStageResult(const std::string& screenName, StageStats* stats) {
+  std::string eventDir;
+  GetCommandlineArgument("pipeline-event-dir", &eventDir);
+  if (eventDir.empty() || stats == nullptr) {
+    return;
+  }
+
+  std::ofstream out(PipelineEventFilePath(eventDir), std::ios::app);
+  if (!out) {
+    LOG->Warn("Pipeline stage result could not open event dir: %s", eventDir.c_str());
+    return;
+  }
+
+  const PlayerNumber player = FirstPipelineResultPlayer();
+  const PlayerStageStats& pss = stats->m_player[player];
+  Song* song = stats->m_vpPlayedSongs.empty() ? GAMESTATE->m_pCurSong
+                                               : stats->m_vpPlayedSongs.back();
+  Steps* steps = pss.m_vpPossibleSteps.empty() ? GAMESTATE->m_pCurSteps[player]
+                                                : pss.m_vpPossibleSteps.back();
+  const std::string stepmaniaVersion =
+      std::string(PRODUCT_FAMILY) + product_version;
+
+  out << "{\"schemaVersion\":1,\"game\":\"stepmania\","
+      << "\"eventType\":\"stage_result\","
+      << "\"source\":{\"install\":\"patched-cli\",\"stepmaniaVersion\":\""
+      << JsonEscape(stepmaniaVersion)
+      << "\",\"capabilityProfile\":\"itgmania-pipeline\"},"
+      << "\"payload\":{\"screen\":\"" << JsonEscape(screenName)
+      << "\",\"song\":{\"title\":\""
+      << JsonEscape(song ? song->GetDisplayMainTitle() : "")
+      << "\",\"artist\":\"" << JsonEscape(song ? song->GetDisplayArtist() : "")
+      << "\",\"group\":\"" << JsonEscape(song ? song->m_sGroupName : "")
+      << "\"},\"chart\":{\"stepsType\":\""
+      << JsonEscape(steps ? StepsTypeToString(steps->m_StepsType) : "unknown")
+      << "\",\"difficulty\":\""
+      << JsonEscape(steps ? DifficultyToString(steps->GetDifficulty()) : "Unknown")
+      << "\",\"meter\":" << (steps ? steps->GetMeter() : 0)
+      << "},\"result\":{\"grade\":\"" << JsonEscape(GradeToString(pss.GetGrade()))
+      << "\",\"score\":" << pss.m_iScore
+      << ",\"maxCombo\":" << pss.GetMaxCombo().m_cnt
+      << ",\"judgments\":{\"w1\":" << pss.m_iTapNoteScores[TNS_W1]
+      << ",\"w2\":" << pss.m_iTapNoteScores[TNS_W2]
+      << ",\"w3\":" << pss.m_iTapNoteScores[TNS_W3]
+      << ",\"w4\":" << pss.m_iTapNoteScores[TNS_W4]
+      << ",\"w5\":" << pss.m_iTapNoteScores[TNS_W5]
+      << ",\"miss\":" << pss.m_iTapNoteScores[TNS_Miss]
+      << "},\"failed\":" << (pss.m_bFailed ? "true" : "false")
+      << "}}}\n";
+}
+}  // namespace
 
 ScreenEvaluation::ScreenEvaluation() {
   GAMESTATE->m_AdjustTokensBySongCostForFinalStageCheck = false;
@@ -271,6 +381,8 @@ void ScreenEvaluation::Init() {
   if (SUMMARY) {
     m_pStageStats->FinalizeScores(true);
   }
+
+  EmitPipelineStageResult(m_sName, m_pStageStats);
 
   // Run this here, so STATSMAN->m_CurStageStats is available to overlays.
   ScreenWithMenuElements::Init();

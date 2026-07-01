@@ -1,6 +1,7 @@
 #include "StepMania.h"
 
 #include <cstdlib>
+#include <fstream>
 #include <utility>
 
 #include "DateTime.h"
@@ -58,6 +59,7 @@
 #include "FontManager.h"
 #include "GameLoop.h"
 #include "GameManager.h"
+#include "GamePreferences.h"
 #include "GameState.h"
 #include "ImageCache.h"
 #include "InputFilter.h"
@@ -74,10 +76,13 @@
 #include "PrefsManager.h"
 #include "Profile.h"
 #include "ProfileManager.h"
+#include "PlayerState.h"
 #include "RageFileManager.h"
 #include "ScreenManager.h"
 #include "SongCacheIndex.h"
 #include "SongManager.h"
+#include "SongUtil.h"
+#include "Steps.h"
 #include "SpecialFiles.h"
 #include "StatsManager.h"
 #include "ThemeManager.h"
@@ -357,6 +362,213 @@ ThemeMetric<std::string> SELECT_MUSIC_SCREEN("Common", "SelectMusicScreen");
 std::string StepMania::GetSelectMusicScreen() {
   return SELECT_MUSIC_SCREEN.GetValue();
 }
+
+namespace {
+std::string JsonEscape(const std::string& value) {
+  std::string escaped;
+  escaped.reserve(value.size() + 8);
+  for (char ch : value) {
+    switch (ch) {
+      case '\\':
+        escaped += "\\\\";
+        break;
+      case '"':
+        escaped += "\\\"";
+        break;
+      case '\n':
+        escaped += "\\n";
+        break;
+      case '\r':
+        escaped += "\\r";
+        break;
+      case '\t':
+        escaped += "\\t";
+        break;
+      default:
+        escaped += ch;
+        break;
+    }
+  }
+  return escaped;
+}
+
+std::string PipelineEventFilePath(const std::string& eventDir) {
+  time_t now = time(nullptr);
+  tm utc;
+#if defined(_WIN32)
+  gmtime_s(&utc, &now);
+#else
+  gmtime_r(&now, &utc);
+#endif
+  char date[16];
+  strftime(date, sizeof(date), "%Y%m%d", &utc);
+
+  std::string path = eventDir;
+  if (!path.empty() && path.back() != '/' && path.back() != '\\') {
+    path += "/";
+  }
+  path += "events-";
+  path += date;
+  path += ".jsonl";
+  return path;
+}
+
+void EmitPipelineEvent(
+    const std::string& eventType, const std::string& eventDir,
+    const std::string& songName, Steps* steps, bool autoplay) {
+  if (eventDir.empty()) {
+    return;
+  }
+
+  std::ofstream out(PipelineEventFilePath(eventDir), std::ios::app);
+  if (!out) {
+    LOG->Warn("Pipeline launch could not open event dir: %s", eventDir.c_str());
+    return;
+  }
+
+  const std::string difficulty =
+      steps ? DifficultyToString(steps->GetDifficulty()) : "Unknown";
+  const std::string stepmaniaVersion =
+      std::string(PRODUCT_FAMILY) + product_version;
+  out << "{\"schemaVersion\":1,\"game\":\"stepmania\",\"eventType\":\""
+      << JsonEscape(eventType)
+      << "\",\"source\":{\"install\":\"patched-cli\",\"stepmaniaVersion\":\""
+      << JsonEscape(stepmaniaVersion)
+      << "\",\"capabilityProfile\":\"itgmania-pipeline"
+      << "\"},\"payload\":{\"launch\":{\"song\":\"" << JsonEscape(songName)
+      << "\",\"difficulty\":\"" << JsonEscape(difficulty)
+      << "\",\"autoplay\":" << (autoplay ? "true" : "false")
+      << "}}}\n";
+}
+
+bool StringArgEnabled(const std::string& value) {
+  return value.empty() || !CompareNoCase(value, "1") ||
+         !CompareNoCase(value, "true") || !CompareNoCase(value, "yes") ||
+         !CompareNoCase(value, "on");
+}
+
+Difficulty ParsePipelineDifficulty(const std::string& value) {
+  if (value.empty()) {
+    return Difficulty_Invalid;
+  }
+
+  Difficulty difficulty = StringToDifficulty(value);
+  if (difficulty != Difficulty_Invalid) {
+    return difficulty;
+  }
+
+  return OldStyleStringToDifficulty(value);
+}
+
+Steps* ChoosePipelineSteps(Song* song, Difficulty requested) {
+  if (!song) {
+    return nullptr;
+  }
+
+  std::vector<Steps*> steps;
+  SongUtil::GetPlayableSteps(song, steps);
+  if (steps.empty()) {
+    steps = song->GetAllSteps();
+  }
+  if (steps.empty()) {
+    return nullptr;
+  }
+
+  if (requested != Difficulty_Invalid) {
+    for (Steps* candidate : steps) {
+      if (candidate && candidate->GetDifficulty() == requested) {
+        return candidate;
+      }
+    }
+  }
+
+  return steps.front();
+}
+
+bool PreparePipelineLaunch(std::string& initialScreenOut) {
+  std::string songName;
+  if (!GetCommandlineArgument("pipeline-song", &songName) || songName.empty()) {
+    GetCommandlineArgument("pipeline-song-dir", &songName);
+  }
+  if (songName.empty()) {
+    return false;
+  }
+
+  std::string screenName = "ScreenGameplay";
+  std::string screenArg;
+  if (GetCommandlineArgument("pipeline-screen", &screenArg) &&
+      !screenArg.empty() && CompareNoCase(screenArg, "gameplay") != 0) {
+    screenName = screenArg;
+  }
+
+  Song* song = SONGMAN ? SONGMAN->FindSong(songName) : nullptr;
+  if (!song) {
+    LOG->Warn("Pipeline launch song not found: %s", songName.c_str());
+    return false;
+  }
+
+  std::string difficultyArg;
+  GetCommandlineArgument("pipeline-difficulty", &difficultyArg);
+  Difficulty difficulty = ParsePipelineDifficulty(difficultyArg);
+  Steps* steps = ChoosePipelineSteps(song, difficulty);
+  if (!steps) {
+    LOG->Warn("Pipeline launch steps not found for song: %s", songName.c_str());
+    return false;
+  }
+
+  GAMESTATE->m_PlayMode.Set(PLAY_MODE_REGULAR);
+  GAMESTATE->JoinPlayer(PLAYER_1);
+  GAMESTATE->SetMasterPlayerNumber(PLAYER_1);
+  GAMESTATE->m_pCurSong.Set(song);
+  GAMESTATE->m_pCurCourse.Set(nullptr);
+  GAMESTATE->m_pCurTrail[PLAYER_1].Set(nullptr);
+  GAMESTATE->SetCurrentStyle(
+      GAMEMAN->GameAndStringToStyle(GAMESTATE->GetCurrentGame(), "single"),
+      PLAYER_1);
+  if (!GAMESTATE->SetCompatibleStyle(steps->m_StepsType, PLAYER_1)) {
+    LOG->Warn(
+        "Pipeline launch could not set compatible style for song: %s",
+        songName.c_str());
+    return false;
+  }
+  GAMESTATE->m_pCurSteps[PLAYER_1].Set(steps);
+
+  std::string autoplayArg;
+  const bool autoplay =
+      GetCommandlineArgument("pipeline-autoplay", &autoplayArg) &&
+      StringArgEnabled(autoplayArg);
+  if (autoplay) {
+    GamePreferences::m_AutoPlay.Set(PC_AUTOPLAY);
+    GAMESTATE->m_pPlayerState[PLAYER_1]->m_PlayerController = PC_AUTOPLAY;
+  }
+
+  const int prepareResult = GAMESTATE->prepare_song_for_gameplay();
+  if (prepareResult != 0) {
+    LOG->Warn(
+        "Pipeline launch prepare_song_for_gameplay failed for %s: %d",
+        songName.c_str(), prepareResult);
+    return false;
+  }
+
+  std::string reason;
+  if (!GAMESTATE->CanSafelyEnterGameplay(reason)) {
+    LOG->Warn("Pipeline launch cannot enter gameplay: %s", reason.c_str());
+    return false;
+  }
+
+  LOG->Info(
+      "Pipeline launch prepared song=%s difficulty=%s screen=%s autoplay=%s",
+      songName.c_str(), DifficultyToString(steps->GetDifficulty()).c_str(),
+      screenName.c_str(),
+      GamePreferences::m_AutoPlay.Get() == PC_AUTOPLAY ? "true" : "false");
+  std::string eventDir;
+  GetCommandlineArgument("pipeline-event-dir", &eventDir);
+  EmitPipelineEvent("session_start", eventDir, songName, steps, autoplay);
+  EmitPipelineEvent("song_start", eventDir, songName, steps, autoplay);
+  initialScreenOut = screenName;
+  return true;
+}
+}  // namespace
 
 #if defined(_WIN32)
 #include "RageDisplay_D3D.h"
@@ -974,7 +1186,9 @@ int sm_main(int argc, char* argv[]) {
   /* Now that GAMESTATE is reset, tell SCREENMAN to update the theme (load
    * overlay screens and global sounds), and load the initial screen. */
   SCREENMAN->ThemeChanged();
-  SCREENMAN->SetNewScreen(StepMania::GetInitialScreen());
+  std::string initialScreen = StepMania::GetInitialScreen();
+  PreparePipelineLaunch(initialScreen);
+  SCREENMAN->SetNewScreen(initialScreen);
 
   // Do this after ThemeChanged so that we can show a system message
   std::string sMessage;
