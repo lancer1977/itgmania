@@ -172,12 +172,30 @@ void EmitPipelineStageResult(const std::string& screenName, StageStats* stats) {
 
   const PlayerNumber player = FirstPipelineResultPlayer();
   const PlayerStageStats& pss = stats->m_player[player];
+  const HighScore& highScore = pss.m_HighScore;
+  const bool hasFinalizedScore = !highScore.IsEmpty();
   Song* song = stats->m_vpPlayedSongs.empty() ? GAMESTATE->m_pCurSong
                                                : stats->m_vpPlayedSongs.back();
   Steps* steps = pss.m_vpPossibleSteps.empty() ? GAMESTATE->m_pCurSteps[player]
                                                 : pss.m_vpPossibleSteps.back();
   const std::string stepmaniaVersion =
       std::string(PRODUCT_FAMILY) + product_version;
+  const Grade grade = hasFinalizedScore ? highScore.GetGrade() : pss.GetGrade();
+  const unsigned int score = hasFinalizedScore ? highScore.GetScore() : pss.m_iScore;
+  const unsigned int maxCombo =
+      hasFinalizedScore ? highScore.GetMaxCombo() : pss.GetMaxCombo().m_cnt;
+  const int w1 = hasFinalizedScore ? highScore.GetTapNoteScore(TNS_W1)
+                                   : pss.m_iTapNoteScores[TNS_W1];
+  const int w2 = hasFinalizedScore ? highScore.GetTapNoteScore(TNS_W2)
+                                   : pss.m_iTapNoteScores[TNS_W2];
+  const int w3 = hasFinalizedScore ? highScore.GetTapNoteScore(TNS_W3)
+                                   : pss.m_iTapNoteScores[TNS_W3];
+  const int w4 = hasFinalizedScore ? highScore.GetTapNoteScore(TNS_W4)
+                                   : pss.m_iTapNoteScores[TNS_W4];
+  const int w5 = hasFinalizedScore ? highScore.GetTapNoteScore(TNS_W5)
+                                   : pss.m_iTapNoteScores[TNS_W5];
+  const int miss = hasFinalizedScore ? highScore.GetTapNoteScore(TNS_Miss)
+                                     : pss.m_iTapNoteScores[TNS_Miss];
 
   out << "{\"schemaVersion\":1,\"game\":\"stepmania\","
       << "\"eventType\":\"stage_result\","
@@ -194,15 +212,15 @@ void EmitPipelineStageResult(const std::string& screenName, StageStats* stats) {
       << "\",\"difficulty\":\""
       << JsonEscape(steps ? DifficultyToString(steps->GetDifficulty()) : "Unknown")
       << "\",\"meter\":" << (steps ? steps->GetMeter() : 0)
-      << "},\"result\":{\"grade\":\"" << JsonEscape(GradeToString(pss.GetGrade()))
-      << "\",\"score\":" << pss.m_iScore
-      << ",\"maxCombo\":" << pss.GetMaxCombo().m_cnt
-      << ",\"judgments\":{\"w1\":" << pss.m_iTapNoteScores[TNS_W1]
-      << ",\"w2\":" << pss.m_iTapNoteScores[TNS_W2]
-      << ",\"w3\":" << pss.m_iTapNoteScores[TNS_W3]
-      << ",\"w4\":" << pss.m_iTapNoteScores[TNS_W4]
-      << ",\"w5\":" << pss.m_iTapNoteScores[TNS_W5]
-      << ",\"miss\":" << pss.m_iTapNoteScores[TNS_Miss]
+      << "},\"result\":{\"grade\":\"" << JsonEscape(GradeToString(grade))
+      << "\",\"score\":" << score
+      << ",\"maxCombo\":" << maxCombo
+      << ",\"judgments\":{\"w1\":" << w1
+      << ",\"w2\":" << w2
+      << ",\"w3\":" << w3
+      << ",\"w4\":" << w4
+      << ",\"w5\":" << w5
+      << ",\"miss\":" << miss
       << "},\"failed\":" << (pss.m_bFailed ? "true" : "false")
       << "}}}\n";
 }

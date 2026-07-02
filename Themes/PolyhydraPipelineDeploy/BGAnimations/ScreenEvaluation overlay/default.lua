@@ -47,7 +47,42 @@ local function grade_to_tier(grade)
   if s:match("tier05") or s:match("c") then return "tier05" end
   if s:match("tier06") or s:match("d") then return "tier06" end
   if s:match("tier07") or s:match("e") or s:match("f") then return "tier07" end
+  local tier = s:match("tier(%d+)")
+  if tier then return "tier" .. tier end
   return "none"
+end
+
+local function call_number(target, method, ...)
+  if not target or not target[method] then return nil end
+  local ok, value = pcall(target[method], target, ...)
+  if not ok then return nil end
+  return tonumber(value)
+end
+
+local function call_bool(target, method)
+  if not target or not target[method] then return nil end
+  local ok, value = pcall(target[method], target)
+  if not ok then return nil end
+  return value == true
+end
+
+local function call_grade(target, method)
+  if not target or not target[method] then return nil end
+  local ok, value = pcall(target[method], target)
+  if not ok then return nil end
+  return value
+end
+
+local function build_judgments(pss, highScore)
+  local scoreSource = highScore or pss
+  return {
+    w1 = call_number(scoreSource, "GetTapNoteScore", "TapNoteScore_W1") or call_number(pss, "GetTapNoteScores", "TapNoteScore_W1") or 0,
+    w2 = call_number(scoreSource, "GetTapNoteScore", "TapNoteScore_W2") or call_number(pss, "GetTapNoteScores", "TapNoteScore_W2") or 0,
+    w3 = call_number(scoreSource, "GetTapNoteScore", "TapNoteScore_W3") or call_number(pss, "GetTapNoteScores", "TapNoteScore_W3") or 0,
+    w4 = call_number(scoreSource, "GetTapNoteScore", "TapNoteScore_W4") or call_number(pss, "GetTapNoteScores", "TapNoteScore_W4") or 0,
+    w5 = call_number(scoreSource, "GetTapNoteScore", "TapNoteScore_W5") or call_number(pss, "GetTapNoteScores", "TapNoteScore_W5") or 0,
+    miss = call_number(scoreSource, "GetTapNoteScore", "TapNoteScore_Miss") or call_number(pss, "GetTapNoteScores", "TapNoteScore_Miss") or 0
+  }
 end
 
 local function get_stage_result_payload()
@@ -89,21 +124,17 @@ local function get_stage_result_payload()
   local failed = false
 
   if pss then
-    if pss.GetGrade then gradeStr = grade_to_tier(pss:GetGrade()) end
-    if pss.GetScore then scoreVal = pss:GetScore() or 0 end
-    if pss.GetMaxCombo then maxCombo = pss:GetMaxCombo() or 0 end
-    if pss.GetTapNoteScores then
-      local tns = pss:GetTapNoteScores()
-      if type(tns) == "table" then
-        local map = { W1 = "w1", w1 = "w1", W2 = "w2", w2 = "w2", W3 = "w3", w3 = "w3", W4 = "w4", w4 = "w4", W5 = "w5", w5 = "w5", Miss = "miss", miss = "miss" }
-        for k, v in pairs(tns) do
-          local key = map[tostring(k):gsub("TNS_", "")] or tostring(k):lower():gsub("tns_", "")
-          if judgments[key] ~= nil then judgments[key] = tonumber(v) or 0
-          elseif key == "miss" then judgments.miss = tonumber(v) or 0 end
-        end
-      end
+    local highScore = nil
+    if pss.GetHighScore then
+      local ok, value = pcall(pss.GetHighScore, pss)
+      if ok then highScore = value end
     end
-    if pss.GetFailed then failed = pss:GetFailed() or false end
+
+    gradeStr = grade_to_tier(call_grade(highScore, "GetGrade") or call_grade(pss, "GetGrade"))
+    scoreVal = call_number(highScore, "GetScore") or call_number(pss, "GetScore") or 0
+    maxCombo = call_number(highScore, "GetMaxCombo") or call_number(pss, "MaxCombo") or 0
+    judgments = build_judgments(pss, highScore)
+    failed = call_bool(pss, "GetFailed") or false
   end
 
   return {

@@ -538,8 +538,9 @@ bool PreparePipelineLaunch(std::string& initialScreenOut) {
       GetCommandlineArgument("pipeline-autoplay", &autoplayArg) &&
       StringArgEnabled(autoplayArg);
   if (autoplay) {
-    GamePreferences::m_AutoPlay.Set(PC_AUTOPLAY);
-    GAMESTATE->m_pPlayerState[PLAYER_1]->m_PlayerController = PC_AUTOPLAY;
+    GamePreferences::m_AutoPlay.Set(PC_CPU);
+    GAMESTATE->m_pPlayerState[PLAYER_1]->m_PlayerController = PC_CPU;
+    GAMESTATE->m_pPlayerState[PLAYER_1]->m_iCpuSkill = NUM_SKILL_LEVELS - 1;
   }
 
   const int prepareResult = GAMESTATE->prepare_song_for_gameplay();
@@ -560,7 +561,7 @@ bool PreparePipelineLaunch(std::string& initialScreenOut) {
       "Pipeline launch prepared song=%s difficulty=%s screen=%s autoplay=%s",
       songName.c_str(), DifficultyToString(steps->GetDifficulty()).c_str(),
       screenName.c_str(),
-      GamePreferences::m_AutoPlay.Get() == PC_AUTOPLAY ? "true" : "false");
+      autoplay ? "true" : "false");
   std::string eventDir;
   GetCommandlineArgument("pipeline-event-dir", &eventDir);
   EmitPipelineEvent("session_start", eventDir, songName, steps, autoplay);
