@@ -73,6 +73,7 @@
 #include "ModelManager.h"
 #include "NetworkManager.h"
 #include "NoteSkinManager.h"
+#include "PlayerAI.h"
 #include "PrefsManager.h"
 #include "Profile.h"
 #include "ProfileManager.h"
