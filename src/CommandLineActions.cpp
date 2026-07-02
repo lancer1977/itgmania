@@ -13,6 +13,7 @@
 #include "XmlFile.h"
 #include "XmlFileUtil.h"
 #include "arch/LoadingWindow/LoadingWindow.h"
+#include "PipelineEvents.h"
 #include "ver.h"
 
 // only used for Version()
@@ -65,49 +66,8 @@ static void Version() {
 #endif  // WIN32
 }
 
-static std::string JsonEscape(const std::string& value) {
-  std::string escaped;
-  escaped.reserve(value.size() + 8);
-  for (char ch : value) {
-    switch (ch) {
-      case '\\':
-        escaped += "\\\\";
-        break;
-      case '"':
-        escaped += "\\\"";
-        break;
-      case '\n':
-        escaped += "\\n";
-        break;
-      case '\r':
-        escaped += "\\r";
-        break;
-      case '\t':
-        escaped += "\\t";
-        break;
-      default:
-        escaped += ch;
-        break;
-    }
-  }
-  return escaped;
-}
-
 static void PipelineCapabilities() {
-  const std::string product = PRODUCT_ID;
-  const std::string version = std::string(PRODUCT_FAMILY) + product_version;
-
-  fprintf(
-      stdout,
-      "{\"schemaVersion\":1,\"game\":\"stepmania\",\"product\":\"%s\","
-      "\"productVersion\":\"%s\",\"gitHash\":\"%s\","
-      "\"capabilityProfile\":\"itgmania-pipeline\","
-      "\"pipelineCli\":{\"supported\":true,\"version\":1,"
-      "\"args\":[\"--pipeline-song\",\"--pipeline-song-dir\","
-      "\"--pipeline-screen\",\"--pipeline-difficulty\","
-      "\"--pipeline-autoplay\",\"--pipeline-event-dir\"]}}\n",
-      JsonEscape(product).c_str(), JsonEscape(version).c_str(),
-      JsonEscape(::sm_version_git_hash).c_str());
+  fprintf(stdout, "%s\n", PipelineEvents::CapabilitiesJson().c_str());
 }
 
 void CommandLineActions::Handle(LoadingWindow* pLW) {
