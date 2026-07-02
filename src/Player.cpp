@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -35,6 +36,7 @@
 #include "PlayerNumber.h"
 #include "PlayerOptions.h"
 #include "PlayerState.h"
+#include "PipelineEvents.h"
 #include "Preference.h"
 #include "PrefsManager.h"
 #include "Profile.h"
@@ -44,18 +46,18 @@
 #include "RageSound.h"
 #include "RageSoundManager.h"
 #include "RageUtil.h"
+#include "Song.h"
+#include "Steps.h"
 #include "RageUtil/RandomNumbers.h"
 #include "ScoreDisplay.h"
 #include "ScoreKeeperNormal.h"
 #include "ScreenDimensions.h"
 #include "ScreenManager.h"
 #include "ScreenMessage.h"
-#include "Song.h"
 #include "SongManager.h"
 #include "SongPosition.h"
 #include "StageStats.h"
 #include "StatsManager.h"
-#include "Steps.h"
 #include "Style.h"
 #include "ThemeManager.h"
 #include "ThemeMetric.h"
@@ -63,6 +65,71 @@
 #include "TimingSegments.h"
 #include "Trail.h"
 #include "global.h"
+
+namespace {
+std::string PipelineSongAndChartJson(PlayerState* playerState) {
+  Song* song = GAMESTATE->m_pCurSong;
+  Steps* steps = nullptr;
+  if (playerState != nullptr && playerState->m_PlayerNumber != PLAYER_INVALID) {
+    steps = GAMESTATE->m_pCurSteps[playerState->m_PlayerNumber];
+  }
+
+  std::ostringstream payload;
+  payload << "\"song\":{\"title\":\""
+          << PipelineEvents::JsonEscape(song ? song->GetDisplayMainTitle() : "")
+          << "\",\"artist\":\""
+          << PipelineEvents::JsonEscape(song ? song->GetDisplayArtist() : "")
+          << "\",\"group\":\""
+          << PipelineEvents::JsonEscape(song ? song->m_sGroupName : "")
+          << "\"},\"chart\":{\"stepsType\":\""
+          << PipelineEvents::JsonEscape(steps ? StepsTypeToString(steps->m_StepsType) : "unknown")
+          << "\",\"difficulty\":\""
+          << PipelineEvents::JsonEscape(steps ? DifficultyToString(steps->GetDifficulty()) : "Unknown")
+          << "\",\"meter\":" << (steps ? steps->GetMeter() : 0) << "}";
+  return payload.str();
+}
+
+void AppendPipelineJudgmentEvent(
+    PlayerState* playerState, PlayerStageStats* playerStats,
+    TapNoteScore tapNoteScore, int row, int track) {
+  std::string eventDir;
+  GetCommandlineArgument("pipeline-event-dir", &eventDir);
+  if (eventDir.empty() || playerState == nullptr || playerStats == nullptr) {
+    return;
+  }
+
+  std::ostringstream payload;
+  payload << "{" << PipelineSongAndChartJson(playerState)
+          << ",\"judgment\":\""
+          << PipelineEvents::JsonEscape(TapNoteScoreToString(tapNoteScore))
+          << "\",\"tapNoteScore\":\""
+          << PipelineEvents::JsonEscape(TapNoteScoreToString(tapNoteScore))
+          << "\",\"combo\":" << playerStats->m_iCurCombo
+          << ",\"beat\":" << NoteRowToBeat(row)
+          << ",\"second\":" << STATSMAN->m_CurStageStats.m_fStepsSeconds
+          << ",\"column\":" << track << "}";
+  PipelineEvents::AppendEvent(
+      eventDir, "judgment", payload.str(), "Pipeline judgment");
+}
+
+void AppendPipelineComboMilestoneEvent(
+    PlayerState* playerState, unsigned int combo) {
+  std::string eventDir;
+  GetCommandlineArgument("pipeline-event-dir", &eventDir);
+  if (eventDir.empty() || playerState == nullptr || combo == 0) {
+    return;
+  }
+
+  std::ostringstream payload;
+  payload << "{" << PipelineSongAndChartJson(playerState)
+          << ",\"combo\":" << combo
+          << ",\"milestone\":\"combo-" << combo << "\""
+          << ",\"second\":" << STATSMAN->m_CurStageStats.m_fStepsSeconds
+          << "}";
+  PipelineEvents::AppendEvent(
+      eventDir, "combo_milestone", payload.str(), "Pipeline combo milestone");
+}
+}  // namespace
 
 std::string ATTACK_DISPLAY_X_NAME(size_t p, size_t both_sides);
 void TimingWindowSecondsInit(
@@ -3291,6 +3358,8 @@ void Player::HandleTapRowScore(unsigned row) {
 
   if (m_pPlayerStageStats) {
     SetCombo(iCurCombo, iCurMissCombo);
+    AppendPipelineJudgmentEvent(
+        m_pPlayerState, m_pPlayerStageStats, scoreOfLastTap, row, -1);
   }
 
 #define CROSSED(x) (iOldCombo < x && iCurCombo >= x)
@@ -3607,18 +3676,23 @@ void Player::SetCombo(unsigned int iCombo, unsigned int iMisses) {
 
   if (b25Milestone) {
     this->PlayCommand("TwentyFiveMilestone");
+    AppendPipelineComboMilestoneEvent(m_pPlayerState, 25);
   }
   if (b50Milestone) {
     this->PlayCommand("FiftyMilestone");
+    AppendPipelineComboMilestoneEvent(m_pPlayerState, 50);
   }
   if (b100Milestone) {
     this->PlayCommand("HundredMilestone");
+    AppendPipelineComboMilestoneEvent(m_pPlayerState, 100);
   }
   if (b250Milestone) {
     this->PlayCommand("TwoHundredFiftyMilestone");
+    AppendPipelineComboMilestoneEvent(m_pPlayerState, 250);
   }
   if (b1000Milestone) {
     this->PlayCommand("ThousandMilestone");
+    AppendPipelineComboMilestoneEvent(m_pPlayerState, 1000);
   }
 
   /* Colored combo logic differs between Songs and Courses.

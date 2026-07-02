@@ -1,7 +1,6 @@
 #include "StepMania.h"
 
 #include <cstdlib>
-#include <fstream>
 #include <utility>
 
 #include "DateTime.h"
@@ -10,6 +9,7 @@
 #include "GameInput.h"
 #include "PlayerNumber.h"
 #include "Preference.h"
+#include "PipelineEvents.h"
 #include "RageException.h"
 #include "RageInputDevice.h"
 #include "RageUtil.h"
@@ -364,81 +364,17 @@ std::string StepMania::GetSelectMusicScreen() {
 }
 
 namespace {
-std::string JsonEscape(const std::string& value) {
-  std::string escaped;
-  escaped.reserve(value.size() + 8);
-  for (char ch : value) {
-    switch (ch) {
-      case '\\':
-        escaped += "\\\\";
-        break;
-      case '"':
-        escaped += "\\\"";
-        break;
-      case '\n':
-        escaped += "\\n";
-        break;
-      case '\r':
-        escaped += "\\r";
-        break;
-      case '\t':
-        escaped += "\\t";
-        break;
-      default:
-        escaped += ch;
-        break;
-    }
-  }
-  return escaped;
-}
-
-std::string PipelineEventFilePath(const std::string& eventDir) {
-  time_t now = time(nullptr);
-  tm utc;
-#if defined(_WIN32)
-  gmtime_s(&utc, &now);
-#else
-  gmtime_r(&now, &utc);
-#endif
-  char date[16];
-  strftime(date, sizeof(date), "%Y%m%d", &utc);
-
-  std::string path = eventDir;
-  if (!path.empty() && path.back() != '/' && path.back() != '\\') {
-    path += "/";
-  }
-  path += "events-";
-  path += date;
-  path += ".jsonl";
-  return path;
-}
-
 void EmitPipelineEvent(
     const std::string& eventType, const std::string& eventDir,
     const std::string& songName, Steps* steps, bool autoplay) {
-  if (eventDir.empty()) {
-    return;
-  }
-
-  std::ofstream out(PipelineEventFilePath(eventDir), std::ios::app);
-  if (!out) {
-    LOG->Warn("Pipeline launch could not open event dir: %s", eventDir.c_str());
-    return;
-  }
-
   const std::string difficulty =
       steps ? DifficultyToString(steps->GetDifficulty()) : "Unknown";
-  const std::string stepmaniaVersion =
-      std::string(PRODUCT_FAMILY) + product_version;
-  out << "{\"schemaVersion\":1,\"game\":\"stepmania\",\"eventType\":\""
-      << JsonEscape(eventType)
-      << "\",\"source\":{\"install\":\"patched-cli\",\"stepmaniaVersion\":\""
-      << JsonEscape(stepmaniaVersion)
-      << "\",\"capabilityProfile\":\"itgmania-pipeline"
-      << "\"},\"payload\":{\"launch\":{\"song\":\"" << JsonEscape(songName)
-      << "\",\"difficulty\":\"" << JsonEscape(difficulty)
-      << "\",\"autoplay\":" << (autoplay ? "true" : "false")
-      << "}}}\n";
+  const std::string payload =
+      std::string("{\"launch\":{\"song\":\"") +
+      PipelineEvents::JsonEscape(songName) + "\",\"difficulty\":\"" +
+      PipelineEvents::JsonEscape(difficulty) + "\",\"autoplay\":" +
+      (autoplay ? "true" : "false") + "}}";
+  PipelineEvents::AppendEvent(eventDir, eventType, payload, "Pipeline launch");
 }
 
 bool StringArgEnabled(const std::string& value) {
