@@ -105,7 +105,23 @@ target_compile_definitions("ixwebsocket" PRIVATE IXWEBSOCKET_USE_MBED_TLS)
 target_compile_definitions("ixwebsocket" PRIVATE IXWEBSOCKET_USE_MBED_TLS_MIN_VERSION_3)
 set(ENABLE_TESTING OFF CACHE INTERNAL "Don't build tests")
 set(GEN_FILES OFF CACHE INTERNAL "Don't generate files (requires perl and python)")
+
+# Keep vendored mbedtls deprecation noise out of normal builds without changing
+# the caller's cache setting or silencing project warnings globally.
+get_property(_sm_had_cmake_warn_deprecated CACHE CMAKE_WARN_DEPRECATED PROPERTY VALUE SET)
+if(_sm_had_cmake_warn_deprecated)
+  get_property(_sm_previous_cmake_warn_deprecated CACHE CMAKE_WARN_DEPRECATED PROPERTY VALUE)
+endif()
+set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "Suppress deprecated CMake warnings in vendored mbedtls" FORCE)
 add_subdirectory("mbedtls" EXCLUDE_FROM_ALL)
+if(_sm_had_cmake_warn_deprecated)
+  set(CMAKE_WARN_DEPRECATED "${_sm_previous_cmake_warn_deprecated}" CACHE BOOL "Suppress deprecated CMake warnings in vendored mbedtls" FORCE)
+else()
+  unset(CMAKE_WARN_DEPRECATED CACHE)
+endif()
+unset(_sm_previous_cmake_warn_deprecated)
+unset(_sm_had_cmake_warn_deprecated)
+
 set_property(TARGET "mbedtls" PROPERTY FOLDER "External Libraries")
 set_property(TARGET "mbedcrypto" PROPERTY FOLDER "External Libraries")
 set_property(TARGET "mbedx509" PROPERTY FOLDER "External Libraries")
