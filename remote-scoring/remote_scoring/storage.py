@@ -268,6 +268,56 @@ class ScoreStore:
             entries.append({"rank": rank, "score": score})
         return entries
 
+    def score_history(
+        self,
+        *,
+        player_guid: str | None = None,
+        song_group: str | None = None,
+        song_hash: str | None = None,
+        song_title: str | None = None,
+        chart_key: str | None = None,
+        chart_hash: str | None = None,
+        difficulty: str | None = None,
+        meter: int | None = None,
+        include_disqualified: bool = False,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        limit = max(1, min(limit, 100))
+        filters: list[str] = []
+        args: list[Any] = []
+
+        equals_filters = {
+            "player_guid": player_guid,
+            "song_group": song_group,
+            "song_hash": song_hash,
+            "song_title": song_title,
+            "chart_key": chart_key,
+            "chart_hash": chart_hash,
+            "difficulty": difficulty,
+            "meter": meter,
+        }
+        for column, value in equals_filters.items():
+            if value is not None and value != "":
+                filters.append(f"{column} = ?")
+                args.append(value)
+
+        if not include_disqualified:
+            filters.append("disqualified = 0")
+
+        where = f"WHERE {' AND '.join(filters)}" if filters else ""
+        args.append(limit)
+        query = f"""
+            SELECT payload_json
+            FROM scores
+            {where}
+            ORDER BY played_at DESC, created_at DESC, percent_dp DESC, score DESC
+            LIMIT ?
+        """
+        with self._connect() as conn:
+            rows = conn.execute(query, args).fetchall()
+
+        return [json.loads(row["payload_json"]) for row in rows]
+
     @staticmethod
     def validate_score(payload: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, dict):

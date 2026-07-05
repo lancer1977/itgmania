@@ -108,6 +108,45 @@ curl 'http://127.0.0.1:8765/v1/leaderboards?song_title=Example%20Song&chart_key=
 
 Returns one stored score by id.
 
+### `GET /v1/scores`
+
+Returns recent score history. Supported filters:
+
+- `player_guid`
+- `song_group`
+- `song_hash`
+- `song_title`
+- `chart_key`
+- `chart_hash`
+- `difficulty`
+- `meter`
+- `include_disqualified`: `true` or `false`, default `false`
+- `limit`: 1-100, default 50
+
+Examples:
+
+```bash
+curl 'http://127.0.0.1:8765/v1/scores?player_guid=profile-guid'
+curl 'http://127.0.0.1:8765/v1/scores?song_group=Pack%20Name&difficulty=Challenge'
+```
+
+### `GET /v1/players/{player_guid}/scores`
+
+Returns recent score history for one player profile GUID.
+
+```bash
+curl 'http://127.0.0.1:8765/v1/players/profile-guid/scores?limit=10'
+```
+
+### `GET /v1/charts/scores`
+
+Returns recent score history for a chart. Requires `chart_hash`, `song_hash`, or
+`song_title` plus `chart_key`.
+
+```bash
+curl 'http://127.0.0.1:8765/v1/charts/scores?chart_hash=optional-chart-hash'
+```
+
 ## Integration Notes
 
 The schema mirrors ITGmania high score concepts without requiring a game-engine

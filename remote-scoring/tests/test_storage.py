@@ -77,3 +77,72 @@ def test_validation_requires_core_identity(tmp_path):
 
     with pytest.raises(ValueError, match="chart_key is required"):
         store.submit_score(payload)
+
+
+def test_score_history_filters_by_player_and_orders_recent_first(tmp_path):
+    store = ScoreStore(tmp_path / "scores.sqlite3")
+    store.submit_score(
+        sample_score(
+            score_id="old",
+            player_guid="player-a",
+            played_at="2026-07-05T20:00:00Z",
+            percent_dp=0.99,
+        )
+    )
+    store.submit_score(
+        sample_score(
+            score_id="new",
+            player_guid="player-a",
+            played_at="2026-07-05T21:00:00Z",
+            percent_dp=0.90,
+        )
+    )
+    store.submit_score(sample_score(score_id="other", player_guid="player-b"))
+
+    scores = store.score_history(player_guid="player-a")
+
+    assert [score["score_id"] for score in scores] == ["new", "old"]
+
+
+def test_score_history_filters_chart_and_excludes_disqualified(tmp_path):
+    store = ScoreStore(tmp_path / "scores.sqlite3")
+    store.submit_score(
+        sample_score(
+            score_id="a",
+            chart_hash="chart-a",
+            song_group="Pack A",
+            difficulty="Challenge",
+            meter=12,
+        )
+    )
+    store.submit_score(
+        sample_score(
+            score_id="b",
+            chart_hash="chart-a",
+            song_group="Pack A",
+            difficulty="Challenge",
+            meter=12,
+            disqualified=True,
+        )
+    )
+    store.submit_score(sample_score(score_id="c", chart_hash="chart-b"))
+
+    scores = store.score_history(
+        chart_hash="chart-a",
+        song_group="Pack A",
+        difficulty="Challenge",
+        meter=12,
+    )
+
+    assert [score["score_id"] for score in scores] == ["a"]
+
+    scores = store.score_history(chart_hash="chart-a", include_disqualified=True)
+
+    assert [score["score_id"] for score in scores] == ["b", "a"]
+
+
+def test_score_history_empty_results(tmp_path):
+    store = ScoreStore(tmp_path / "scores.sqlite3")
+    store.submit_score(sample_score(score_id="a", player_guid="player-a"))
+
+    assert store.score_history(player_guid="missing") == []

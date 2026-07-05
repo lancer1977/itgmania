@@ -53,6 +53,10 @@ class RemoteScoringHandler(BaseHTTPRequestHandler):
             self.handle_leaderboard(parsed.query)
             return
 
+        if parsed.path == "/v1/scores":
+            self.handle_score_history(parsed.query)
+            return
+
         if parsed.path.startswith("/v1/scores/"):
             score_id = unquote(parsed.path.removeprefix("/v1/scores/"))
             score = self.store.get_score(score_id)
@@ -60,6 +64,17 @@ class RemoteScoringHandler(BaseHTTPRequestHandler):
                 self.respond_error(HTTPStatus.NOT_FOUND, "score not found")
                 return
             self.respond_json(HTTPStatus.OK, {"score": score})
+            return
+
+        if parsed.path.startswith("/v1/players/") and parsed.path.endswith("/scores"):
+            player_guid = unquote(
+                parsed.path.removeprefix("/v1/players/").removesuffix("/scores")
+            )
+            self.handle_score_history(parsed.query, player_guid=player_guid)
+            return
+
+        if parsed.path == "/v1/charts/scores":
+            self.handle_score_history(parsed.query, require_chart_filter=True)
             return
 
         self.respond_error(HTTPStatus.NOT_FOUND, "route not found")
@@ -128,6 +143,58 @@ class RemoteScoringHandler(BaseHTTPRequestHandler):
             return
 
         self.respond_json(HTTPStatus.OK, {"entries": entries})
+
+    def handle_score_history(
+        self,
+        query: str,
+        *,
+        player_guid: str | None = None,
+        require_chart_filter: bool = False,
+    ) -> None:
+        params = parse_qs(query)
+
+        def one(key: str) -> str | None:
+            values = params.get(key)
+            return values[0] if values else None
+
+        def optional_int(key: str) -> int | None:
+            value = one(key)
+            if value is None or value == "":
+                return None
+            return int(value)
+
+        try:
+            limit = int(one("limit") or "50")
+            meter = optional_int("meter")
+        except ValueError:
+            self.respond_error(HTTPStatus.BAD_REQUEST, "limit and meter must be integers")
+            return
+
+        resolved_player_guid = player_guid or one("player_guid")
+        chart_hash = one("chart_hash")
+        song_hash = one("song_hash")
+        song_title = one("song_title")
+        chart_key = one("chart_key")
+        if require_chart_filter and not (chart_hash or song_hash or (song_title and chart_key)):
+            self.respond_error(
+                HTTPStatus.BAD_REQUEST,
+                "provide chart_hash, song_hash, or song_title plus chart_key",
+            )
+            return
+
+        scores = self.store.score_history(
+            player_guid=resolved_player_guid,
+            song_group=one("song_group"),
+            song_hash=song_hash,
+            song_title=song_title,
+            chart_key=chart_key,
+            chart_hash=chart_hash,
+            difficulty=one("difficulty"),
+            meter=meter,
+            include_disqualified=parse_bool(one("include_disqualified")),
+            limit=limit,
+        )
+        self.respond_json(HTTPStatus.OK, {"scores": scores})
 
     def respond_json(self, status: HTTPStatus, payload: object) -> None:
         body = json_bytes(payload)

@@ -79,11 +79,27 @@ def main() -> int:
     assert entries, leaderboard
     assert entries[0]["score"]["score_id"] == score["score_id"], leaderboard
 
+    player_history = request_json(
+        f"{endpoint}/v1/players/{score['player_guid']}/scores?limit=5",
+        timeout=args.timeout,
+    )
+    assert player_history.get("scores"), player_history
+    assert player_history["scores"][0]["score_id"] == score["score_id"], player_history
+
+    chart_history = request_json(
+        f"{endpoint}/v1/charts/scores?chart_hash={urllib.parse.quote(score['chart_hash'])}",
+        timeout=args.timeout,
+    )
+    assert chart_history.get("scores"), chart_history
+    assert chart_history["scores"][0]["score_id"] == score["score_id"], chart_history
+
     print(json.dumps({
         "ok": True,
         "health": health,
         "score_id": score["score_id"],
         "leaderboard_entries": len(entries),
+        "player_history_entries": len(player_history["scores"]),
+        "chart_history_entries": len(chart_history["scores"]),
     }, sort_keys=True))
     return 0
 
