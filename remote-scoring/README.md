@@ -22,6 +22,29 @@ Environment variables:
 - `REMOTE_SCORING_WRITE_TOKEN`: bearer token required for score submission,
   default `dev-token`
 
+## Run With Docker Compose
+
+```bash
+cd remote-scoring
+export REMOTE_SCORING_WRITE_TOKEN=change-me
+docker compose up --build
+```
+
+Compose binds the service to `0.0.0.0:8765` inside the container, publishes it
+to `${REMOTE_SCORING_PORT:-8765}` on the host, and stores SQLite data in the
+named volume `remote-scoring-data` at `/data/remote-scoring.sqlite3`.
+
+Verify a running service with the smoke script:
+
+```bash
+python3 scripts/smoke_http.py \
+  --endpoint http://127.0.0.1:${REMOTE_SCORING_PORT:-8765} \
+  --token "$REMOTE_SCORING_WRITE_TOKEN"
+```
+
+The smoke script checks `/health`, submits an idempotent score, and verifies the
+score appears in a leaderboard response.
+
 ## API
 
 ### `GET /health`

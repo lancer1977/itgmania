@@ -1,0 +1,18 @@
+services:
+  remote-scoring:
+    build:
+      context: .
+    image: itgmania-remote-scoring:local
+    environment:
+      REMOTE_SCORING_HOST: 0.0.0.0
+      REMOTE_SCORING_PORT: 8765
+      REMOTE_SCORING_DB: /data/remote-scoring.sqlite3
+      REMOTE_SCORING_WRITE_TOKEN: ${REMOTE_SCORING_WRITE_TOKEN:-dev-token}
+    ports:
+      - "${REMOTE_SCORING_PORT:-8765}:8765"
+    volumes:
+      - remote-scoring-data:/data
+    restart: unless-stopped
+
+volumes:
+  remote-scoring-data:
