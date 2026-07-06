@@ -686,6 +686,11 @@ RageDisplay* CreateDisplay() {
    * better.
    */
 
+  if (GetCommandlineArgument("pipeline-event-dir")) {
+    PREFSMAN->m_sLastSeenVideoDriver.Set(GetVideoDriverName());
+    PREFSMAN->m_sVideoRenderers.Set("null");
+  }
+
   // bool bAppliedDefaults = CheckVideoDefaultSettings();
   CheckVideoDefaultSettings();
 
@@ -971,6 +976,8 @@ int sm_main(int argc, char* argv[]) {
   ApplyLogPreferences();
 
   WriteLogHeader();
+
+  CommandLineActions::HandleStartupExitActions();
 
   // Set up alternative filesystem trees.
   MountFolders("dirro", PREFSMAN->m_sAdditionalFoldersReadOnly.Get(), "/");

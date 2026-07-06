@@ -70,6 +70,15 @@ static void PipelineCapabilities() {
   fprintf(stdout, "%s\n", PipelineEvents::CapabilitiesJson().c_str());
 }
 
+bool CommandLineActions::HandleStartupExitActions() {
+  if (GetCommandlineArgument("pipeline-capabilities")) {
+    PipelineCapabilities();
+    exit(0);
+  }
+
+  return false;
+}
+
 void CommandLineActions::Handle(LoadingWindow* pLW) {
   CommandLineArgs args;
   for (int i = 0; i < g_argc; ++i) {
