@@ -1,0 +1,18 @@
+name: Catalog Manifest
+
+on:
+  pull_request:
+    paths:
+      - polyhydra.project.json
+  push:
+    branches: [main]
+    paths:
+      - polyhydra.project.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    uses: lancer1977/dev-forge/.github/workflows/catalog-manifest-validate-reusable.yml@main

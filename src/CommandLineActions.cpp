@@ -7,13 +7,13 @@
 
 #include "DateTime.h"
 #include "LuaManager.h"
+#include "PipelineEvents.h"
 #include "Preference.h"
 #include "ProductInfo.h"
 #include "RageUtil.h"
 #include "XmlFile.h"
 #include "XmlFileUtil.h"
 #include "arch/LoadingWindow/LoadingWindow.h"
-#include "PipelineEvents.h"
 #include "ver.h"
 
 // only used for Version()
@@ -68,6 +68,15 @@ static void Version() {
 
 static void PipelineCapabilities() {
   fprintf(stdout, "%s\n", PipelineEvents::CapabilitiesJson().c_str());
+}
+
+bool CommandLineActions::HandleStartupExitActions() {
+  if (GetCommandlineArgument("pipeline-capabilities")) {
+    PipelineCapabilities();
+    exit(0);
+  }
+
+  return false;
 }
 
 void CommandLineActions::Handle(LoadingWindow* pLW) {

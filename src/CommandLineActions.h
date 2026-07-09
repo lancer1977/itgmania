@@ -9,6 +9,11 @@ class LoadingWindow;
 /** @brief The collection of command line actions. */
 namespace CommandLineActions {
 /**
+ * @brief Perform startup utility functions that exit without requiring UI.
+ * @return true if a startup action handled the process and exited. */
+bool HandleStartupExitActions();
+
+/**
  * @brief Perform a utility function, then exit.
  * @param pLW the LoadingWindow that is presently not used? */
 void Handle(LoadingWindow* pLW);

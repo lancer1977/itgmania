@@ -7,9 +7,9 @@
 #include "EnumHelper.h"
 #include "GameConstantsAndTypes.h"
 #include "GameInput.h"
+#include "PipelineEvents.h"
 #include "PlayerNumber.h"
 #include "Preference.h"
-#include "PipelineEvents.h"
 #include "RageException.h"
 #include "RageInputDevice.h"
 #include "RageUtil.h"
@@ -74,18 +74,18 @@
 #include "NetworkManager.h"
 #include "NoteSkinManager.h"
 #include "PlayerAI.h"
+#include "PlayerState.h"
 #include "PrefsManager.h"
 #include "Profile.h"
 #include "ProfileManager.h"
-#include "PlayerState.h"
 #include "RageFileManager.h"
 #include "ScreenManager.h"
 #include "SongCacheIndex.h"
 #include "SongManager.h"
 #include "SongUtil.h"
-#include "Steps.h"
 #include "SpecialFiles.h"
 #include "StatsManager.h"
+#include "Steps.h"
 #include "ThemeManager.h"
 #include "UnlockManager.h"
 #include "ver.h"
@@ -373,8 +373,8 @@ void EmitPipelineEvent(
   const std::string payload =
       std::string("{\"launch\":{\"song\":\"") +
       PipelineEvents::JsonEscape(songName) + "\",\"difficulty\":\"" +
-      PipelineEvents::JsonEscape(difficulty) + "\",\"autoplay\":" +
-      (autoplay ? "true" : "false") + "}}";
+      PipelineEvents::JsonEscape(difficulty) +
+      "\",\"autoplay\":" + (autoplay ? "true" : "false") + "}}";
   PipelineEvents::AppendEvent(eventDir, eventType, payload, "Pipeline launch");
 }
 
@@ -497,8 +497,7 @@ bool PreparePipelineLaunch(std::string& initialScreenOut) {
   LOG->Info(
       "Pipeline launch prepared song=%s difficulty=%s screen=%s autoplay=%s",
       songName.c_str(), DifficultyToString(steps->GetDifficulty()).c_str(),
-      screenName.c_str(),
-      autoplay ? "true" : "false");
+      screenName.c_str(), autoplay ? "true" : "false");
   std::string eventDir;
   GetCommandlineArgument("pipeline-event-dir", &eventDir);
   EmitPipelineEvent("session_start", eventDir, songName, steps, autoplay);
@@ -685,6 +684,11 @@ RageDisplay* CreateDisplay() {
    * Actually, right now we're falling back. I'm not sure which behavior is
    * better.
    */
+
+  if (GetCommandlineArgument("pipeline-event-dir")) {
+    PREFSMAN->m_sLastSeenVideoDriver.Set(GetVideoDriverName());
+    PREFSMAN->m_sVideoRenderers.Set("null");
+  }
 
   // bool bAppliedDefaults = CheckVideoDefaultSettings();
   CheckVideoDefaultSettings();
@@ -971,6 +975,8 @@ int sm_main(int argc, char* argv[]) {
   ApplyLogPreferences();
 
   WriteLogHeader();
+
+  CommandLineActions::HandleStartupExitActions();
 
   // Set up alternative filesystem trees.
   MountFolders("dirro", PREFSMAN->m_sAdditionalFoldersReadOnly.Get(), "/");
