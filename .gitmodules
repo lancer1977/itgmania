@@ -2,6 +2,70 @@
 	path = Themes/Simply Love
 	url = https://github.com/Simply-Love/Simply-Love-SM5.git
 	shallow = true
+[submodule "Themes/PolyhydraCommandProbe"]
+	path = Themes/PolyhydraCommandProbe
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraDofileProbe"]
+	path = Themes/PolyhydraDofileProbe
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraDofileProbe2"]
+	path = Themes/PolyhydraDofileProbe2
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraEventBusProbe"]
+	path = Themes/PolyhydraEventBusProbe
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraEventBusProbe2"]
+	path = Themes/PolyhydraEventBusProbe2
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraIoProbe"]
+	path = Themes/PolyhydraIoProbe
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraRageFileProbe"]
+	path = Themes/PolyhydraRageFileProbe
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraSimplyLoveBootstrap"]
+	path = Themes/PolyhydraSimplyLoveBootstrap
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraThemeBootstrapDedup"]
+	path = Themes/PolyhydraThemeBootstrapDedup
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraThemeBootstrapFull"]
+	path = Themes/PolyhydraThemeBootstrapFull
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraThemeBootstrapFullPercent"]
+	path = Themes/PolyhydraThemeBootstrapFullPercent
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraThemeBootstrapMetrics"]
+	path = Themes/PolyhydraThemeBootstrapMetrics
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraThemeBootstrapNoClassCli"]
+	path = Themes/PolyhydraThemeBootstrapNoClassCli
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraThemeBootstrapNoMetricCli"]
+	path = Themes/PolyhydraThemeBootstrapNoMetricCli
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraThemeBootstrapRageFile"]
+	path = Themes/PolyhydraThemeBootstrapRageFile
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
+[submodule "Themes/PolyhydraThemeBootstrapScreenOn"]
+	path = Themes/PolyhydraThemeBootstrapScreenOn
+	url = https://github.com/Simply-Love/Simply-Love-SM5.git
+	shallow = true
 [submodule "extern/ixwebsocket"]
 	path = extern/IXWebSocket
 	url = https://github.com/machinezone/IXWebSocket.git
