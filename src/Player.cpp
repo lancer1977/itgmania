@@ -32,11 +32,11 @@
 #include "NoteDataWithScoring.h"
 #include "NoteField.h"
 #include "NoteTypes.h"
+#include "PipelineEvents.h"
 #include "PlayerAI.h"
 #include "PlayerNumber.h"
 #include "PlayerOptions.h"
 #include "PlayerState.h"
-#include "PipelineEvents.h"
 #include "Preference.h"
 #include "PrefsManager.h"
 #include "Profile.h"
@@ -46,18 +46,18 @@
 #include "RageSound.h"
 #include "RageSoundManager.h"
 #include "RageUtil.h"
-#include "Song.h"
-#include "Steps.h"
 #include "RageUtil/RandomNumbers.h"
 #include "ScoreDisplay.h"
 #include "ScoreKeeperNormal.h"
 #include "ScreenDimensions.h"
 #include "ScreenManager.h"
 #include "ScreenMessage.h"
+#include "Song.h"
 #include "SongManager.h"
 #include "SongPosition.h"
 #include "StageStats.h"
 #include "StatsManager.h"
+#include "Steps.h"
 #include "Style.h"
 #include "ThemeManager.h"
 #include "ThemeMetric.h"
@@ -82,9 +82,11 @@ std::string PipelineSongAndChartJson(PlayerState* playerState) {
           << "\",\"group\":\""
           << PipelineEvents::JsonEscape(song ? song->m_sGroupName : "")
           << "\"},\"chart\":{\"stepsType\":\""
-          << PipelineEvents::JsonEscape(steps ? StepsTypeToString(steps->m_StepsType) : "unknown")
+          << PipelineEvents::JsonEscape(
+                 steps ? StepsTypeToString(steps->m_StepsType) : "unknown")
           << "\",\"difficulty\":\""
-          << PipelineEvents::JsonEscape(steps ? DifficultyToString(steps->GetDifficulty()) : "Unknown")
+          << PipelineEvents::JsonEscape(
+                 steps ? DifficultyToString(steps->GetDifficulty()) : "Unknown")
           << "\",\"meter\":" << (steps ? steps->GetMeter() : 0) << "}";
   return payload.str();
 }
@@ -99,8 +101,7 @@ void AppendPipelineJudgmentEvent(
   }
 
   std::ostringstream payload;
-  payload << "{" << PipelineSongAndChartJson(playerState)
-          << ",\"judgment\":\""
+  payload << "{" << PipelineSongAndChartJson(playerState) << ",\"judgment\":\""
           << PipelineEvents::JsonEscape(TapNoteScoreToString(tapNoteScore))
           << "\",\"tapNoteScore\":\""
           << PipelineEvents::JsonEscape(TapNoteScoreToString(tapNoteScore))
@@ -122,10 +123,9 @@ void AppendPipelineComboMilestoneEvent(
 
   std::ostringstream payload;
   payload << "{" << PipelineSongAndChartJson(playerState)
-          << ",\"combo\":" << combo
-          << ",\"milestone\":\"combo-" << combo << "\""
-          << ",\"second\":" << STATSMAN->m_CurStageStats.m_fStepsSeconds
-          << "}";
+          << ",\"combo\":" << combo << ",\"milestone\":\"combo-" << combo
+          << "\""
+          << ",\"second\":" << STATSMAN->m_CurStageStats.m_fStepsSeconds << "}";
   PipelineEvents::AppendEvent(
       eventDir, "combo_milestone", payload.str(), "Pipeline combo milestone");
 }
