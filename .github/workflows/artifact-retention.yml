@@ -34,10 +34,8 @@ jobs:
           tmpdir=$(mktemp -d)
           trap 'rm -rf "${tmpdir}"' EXIT
 
-          prefix="ITGmania-${CHANNEL}-"
           active_runs="${tmpdir}/active-runs"
           : > "${active_runs}"
-
           for status in queued in_progress; do
             gh api "repos/${REPOSITORY}/actions/workflows/release.yml/runs?branch=${CHANNEL}&status=${status}&per_page=100" \
               --jq '.workflow_runs[].id' >> "${active_runs}"
@@ -54,22 +52,35 @@ jobs:
           )
 
           if [ -z "${latest_successful_run}" ]; then
-            echo "No successful ${CHANNEL} release run exists; deleting all ${CHANNEL} artifacts."
+            echo "No successful ${CHANNEL} Release run exists; deleting all completed Release artifacts for this channel."
           else
-            echo "Keeping ${CHANNEL} artifact set from successful run ${latest_successful_run}."
+            echo "Keeping ${CHANNEL} artifact set from successful Release run ${latest_successful_run}."
           fi
 
-          artifact_ids="${tmpdir}/artifact-ids"
-          PREFIX="${prefix}" KEEP_RUN="${latest_successful_run:-0}" gh api --paginate "repos/${REPOSITORY}/actions/artifacts?per_page=100" \
+          # `actions/upload-artifact` with archive disabled exposes the package
+          # filename as the artifact name. Scope cleanup by the Release workflow
+          # run ID and branch channel, never by a display-name convention.
+          release_run_ids="${tmpdir}/release-run-ids"
+          gh api --paginate "repos/${REPOSITORY}/actions/workflows/release.yml/runs?branch=${CHANNEL}&per_page=100" \
+            --jq '.workflow_runs[].id' > "${release_run_ids}"
+
+          artifact_records="${tmpdir}/artifact-records"
+          CHANNEL="${CHANNEL}" gh api --paginate "repos/${REPOSITORY}/actions/artifacts?per_page=100" \
             --jq '.artifacts[]
               | select(.expired == false)
-              | select(.name | startswith(env.PREFIX))
               | select(.workflow_run.head_branch == env.CHANNEL)
-              | select(.workflow_run.id != (env.KEEP_RUN | tonumber?))
-              | .id' > "${artifact_ids}"
+              | [.id, .workflow_run.id]
+              | @tsv' > "${artifact_records}"
 
-          while IFS= read -r artifact_id; do
+          while IFS=$'\t' read -r artifact_id artifact_run_id; do
             [ -z "${artifact_id}" ] && continue
-            echo "Deleting superseded ${CHANNEL} artifact ${artifact_id}."
+            if ! grep -Fxq "${artifact_run_id}" "${release_run_ids}"; then
+              echo "Preserving artifact ${artifact_id}: its run is outside Release workflow scope."
+              continue
+            fi
+            if [ "${artifact_run_id}" = "${latest_successful_run:-0}" ]; then
+              continue
+            fi
+            echo "Deleting superseded ${CHANNEL} Release artifact ${artifact_id} from run ${artifact_run_id}."
             gh api --method DELETE "repos/${REPOSITORY}/actions/artifacts/${artifact_id}"
-          done < "${artifact_ids}"
+          done < "${artifact_records}"
