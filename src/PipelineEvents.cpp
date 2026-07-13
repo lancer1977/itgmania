@@ -100,7 +100,8 @@ std::string SourceJson() {
 
 std::string CapabilitiesJson() {
   const std::string product = PRODUCT_ID;
-  return std::string("{\"schemaVersion\":1,\"game\":\"stepmania\",\"product\":\"") +
+  return std::string(
+             "{\"schemaVersion\":1,\"game\":\"stepmania\",\"product\":\"") +
          JsonEscape(product) + "\",\"productVersion\":\"" +
          JsonEscape(ProductVersion()) + "\",\"gitHash\":\"" +
          JsonEscape(::sm_version_git_hash) +
