@@ -1,0 +1,75 @@
+name: Retain stable and debug artifacts
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  retain-latest-complete-channel-set:
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [release, beta]
+    concurrency:
+      # Shares the Release channel lock, so cleanup cannot race a new build.
+      group: itgmania-release-${{ matrix.channel }}
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Retain latest successful channel set
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          CHANNEL: ${{ matrix.channel }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmpdir=$(mktemp -d)
+          trap 'rm -rf "${tmpdir}"' EXIT
+
+          prefix="ITGmania-${CHANNEL}-"
+          active_runs="${tmpdir}/active-runs"
+          : > "${active_runs}"
+
+          for status in queued in_progress; do
+            gh api "repos/${REPOSITORY}/actions/workflows/release.yml/runs?branch=${CHANNEL}&status=${status}&per_page=100" \
+              --jq '.workflow_runs[].id' >> "${active_runs}"
+          done
+
+          if [ -s "${active_runs}" ]; then
+            echo "A ${CHANNEL} release run is active; skipping cleanup for this channel."
+            exit 0
+          fi
+
+          latest_successful_run=$(
+            gh api "repos/${REPOSITORY}/actions/workflows/release.yml/runs?branch=${CHANNEL}&status=success&per_page=1" \
+              --jq '.workflow_runs[0].id // empty'
+          )
+
+          if [ -z "${latest_successful_run}" ]; then
+            echo "No successful ${CHANNEL} release run exists; deleting all ${CHANNEL} artifacts."
+          else
+            echo "Keeping ${CHANNEL} artifact set from successful run ${latest_successful_run}."
+          fi
+
+          artifact_ids="${tmpdir}/artifact-ids"
+          PREFIX="${prefix}" KEEP_RUN="${latest_successful_run:-0}" gh api --paginate "repos/${REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[]
+              | select(.expired == false)
+              | select(.name | startswith(env.PREFIX))
+              | select(.workflow_run.head_branch == env.CHANNEL)
+              | select(.workflow_run.id != (env.KEEP_RUN | tonumber?))
+              | .id' > "${artifact_ids}"
+
+          while IFS= read -r artifact_id; do
+            [ -z "${artifact_id}" ] && continue
+            echo "Deleting superseded ${CHANNEL} artifact ${artifact_id}."
+            gh api --method DELETE "repos/${REPOSITORY}/actions/artifacts/${artifact_id}"
+          done < "${artifact_ids}"

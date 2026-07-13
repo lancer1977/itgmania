@@ -6,6 +6,13 @@ on:
 
 name: Release
 
+# Keep one complete artifact set for each channel: `release` is stable and
+# `beta` is the debug/test channel. A newer run supersedes any older run for
+# that same channel before it can retain a second complete set.
+concurrency:
+  group: itgmania-release-${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -71,7 +78,7 @@ jobs:
         id: upload
         uses: actions/upload-artifact@v7
         with:
-          name: ITGmania-${{ github.sha }}-${{ matrix.os }}-ClubFantastic-${{ matrix.club_fantastic }}
+          name: ITGmania-${{ github.ref_name }}-${{ github.sha }}-${{ matrix.os }}-ClubFantastic-${{ matrix.club_fantastic }}
           path: ${{ env.ARTIFACT_PATH }}
           archive: false
 
