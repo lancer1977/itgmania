@@ -16,9 +16,6 @@ concurrency:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    permissions:
-      id-token: write
-      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -74,15 +71,6 @@ jobs:
           fi
         shell: bash
 
-      - name: Upload artifacts
-        id: upload
-        uses: actions/upload-artifact@v7
-        with:
-          name: ITGmania-${{ github.ref_name }}-${{ github.sha }}-${{ matrix.os }}-ClubFantastic-${{ matrix.club_fantastic }}
-          path: ${{ env.ARTIFACT_PATH }}
-          archive: false
-
-      - uses: actions/attest@v4
-        with:
-          subject-name: ITGmania-${{ github.sha }}-${{ matrix.os }}-ClubFantastic-${{ matrix.club_fantastic }}
-          subject-digest: sha256:${{ steps.upload.outputs.artifact-digest }}
+      # Do not upload package artifacts to GitHub Actions until a durable
+      # release destination (for example, the local CDN) is configured.
+      # Package creation above remains the platform build proof.
