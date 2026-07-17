@@ -3,9 +3,9 @@
 Most users will find everything they need in this README. There are differences in the build process for ITGmania as compared to Stepmania, so it is recommended to stick with these ITGmania instructions. For anything not covered in this guide, you can usually refer to the original Stepmania documents [here](https://github.com/stepmania/stepmania/wiki/Compiling-StepMania), as long as you replace references to Stepmania with ITGmania.
 
 ## Continuous Integration
-Pushes to the `beta` branch of the repository are built with a [GitHub Actions workflow](https://github.com/itgmania/itgmania/actions/workflows/release.yml), in which "nightly releases" are compiled for a matrix of operating systems and architectures. Full releases are built on pushses to the `release` branch.
+This fork's [GitHub Actions workflows](https://github.com/lancer1977/itgmania/actions) use two packaging channels: pushes to `beta` create nightly/debug packages, while pushes to the default `release` branch create full-release packages for the supported platform matrix.
 
-By default, GitHub stores build artifacts for 90 days. People who are signed into GitHub and have read access to a repository can download workflow artifacts. They can be downloaded from the Artifacts section of the Summary page on an execution of the workflow.
+The workflows build and package those outputs as CI proof, but they intentionally do **not** upload package artifacts to GitHub Actions until a durable release destination is configured. Do not treat a successful workflow run as a downloadable release artifact.
 
 ## Local Development
 
