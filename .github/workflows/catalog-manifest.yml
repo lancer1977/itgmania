@@ -5,7 +5,8 @@ on:
     paths:
       - polyhydra.project.json
   push:
-    branches: [main]
+    # This fork integrates through `release`, not `main`.
+    branches: [release]
     paths:
       - polyhydra.project.json
   workflow_dispatch:

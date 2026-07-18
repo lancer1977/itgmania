@@ -10,7 +10,9 @@ on:
             - "**.cpp"
             - "**.mm"
     pull_request:
-        branches: [beta]
+        # Most maintenance PRs target the default `release` branch. Keep the
+        # pre-merge analysis contract aligned with both supported channels.
+        branches: [release, beta]
         paths:
             - "**.h"
             - "**.hpp"

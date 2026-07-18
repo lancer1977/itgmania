@@ -2,6 +2,7 @@
 set -euo pipefail
 
 bash -n Installer/setup.sh Utils/*.sh extern/libtomcrypt/*.sh extern/libtommath/*.sh extern/ogg/autogen.sh extern/vorbis/autogen.sh
+./scripts/validate-workflow-contract.sh
 git diff --check
 
 if [[ -d build ]]; then
