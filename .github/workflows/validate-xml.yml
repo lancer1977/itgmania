@@ -10,6 +10,10 @@ on:
       - 'Docs/Luadoc/Lua.xml'
       - 'Docs/Luadoc/LuaDocumentation.xml'
 
+concurrency:
+  group: itgmania-xml-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate-xml-docs:
     name: Validate Lua.xml, LuaDocumentation.xml
