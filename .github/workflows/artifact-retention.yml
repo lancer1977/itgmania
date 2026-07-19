@@ -18,8 +18,9 @@ jobs:
       matrix:
         channel: [release, beta]
     concurrency:
-      # Shares the Release channel lock, so cleanup cannot race a new build.
-      group: itgmania-release-${{ matrix.channel }}
+      # Keep retention work in its own lock; the cleanup script checks active
+      # Release runs before deleting artifacts and must not evict a queued build.
+      group: itgmania-retention-${{ matrix.channel }}
       cancel-in-progress: false
     runs-on: ubuntu-24.04
     steps:

@@ -11,7 +11,7 @@ name: Release
 # that same channel before it can retain a second complete set.
 concurrency:
   group: itgmania-release-${{ github.ref_name }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:

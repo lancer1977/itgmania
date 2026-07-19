@@ -14,6 +14,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: itgmania-catalog-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     uses: lancer1977/dev-forge/.github/workflows/catalog-manifest-validate-reusable.yml@main

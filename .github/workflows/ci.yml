@@ -4,6 +4,10 @@ on:
     paths-ignore:
       - '**.md'
 
+concurrency:
+  group: itgmania-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 name: Continuous integration
 
 jobs:
