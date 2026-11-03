@@ -26,13 +26,13 @@
 #include "LuaManager.h"
 #include "MemoryCardManager.h"
 #include "ModsGroup.h"
+#include "PipelineEvents.h"
 #include "PlayerNumber.h"
 #include "PlayerState.h"
-#include "PipelineEvents.h"
 #include "PrefsManager.h"
+#include "ProductInfo.h"
 #include "Profile.h"
 #include "ProfileManager.h"
-#include "ProductInfo.h"
 #include "RageLog.h"
 #include "RageUtil.h"
 #include "RageUtil/RandomNumbers.h"
@@ -118,73 +118,128 @@ void EmitPipelineStageResult(const std::string& screenName, StageStats* stats) {
   const PlayerNumber player = FirstPipelineResultPlayer();
   const PlayerStageStats& pss = stats->m_player[player];
   Song* song = stats->m_vpPlayedSongs.empty() ? GAMESTATE->m_pCurSong
-                                               : stats->m_vpPlayedSongs.back();
+                                              : stats->m_vpPlayedSongs.back();
   Steps* steps = pss.m_vpPossibleSteps.empty() ? GAMESTATE->m_pCurSteps[player]
-                                                : pss.m_vpPossibleSteps.back();
+                                               : pss.m_vpPossibleSteps.back();
   const HighScore& highScore = pss.m_HighScore;
   const bool hasFinalHighScore = !highScore.IsEmpty();
-  const unsigned int finalScore = hasFinalHighScore ? highScore.GetScore() : pss.m_iScore;
-  const unsigned int finalMaxCombo = hasFinalHighScore ? highScore.GetMaxCombo() : pss.GetMaxCombo().m_cnt;
-  const Grade finalGrade = hasFinalHighScore ? highScore.GetGrade() : pss.GetGrade();
+  const unsigned int finalScore =
+      hasFinalHighScore ? highScore.GetScore() : pss.m_iScore;
+  const unsigned int finalMaxCombo =
+      hasFinalHighScore ? highScore.GetMaxCombo() : pss.GetMaxCombo().m_cnt;
+  const Grade finalGrade =
+      hasFinalHighScore ? highScore.GetGrade() : pss.GetGrade();
+
+  const std::string playerSlot = PlayerNumberToString(player);
+  std::string playerName = playerSlot;
+  std::string playerGuid = playerSlot;
+  if (PROFILEMAN != nullptr) {
+    const std::string profileName = PROFILEMAN->GetPlayerName(player);
+    if (!profileName.empty()) {
+      playerName = profileName;
+    }
+    // GetProfile() returns a placeholder profile with a random GUID when no
+    // profile is loaded, so only use it for persistent (loaded) profiles.
+    const Profile* profile = PROFILEMAN->IsPersistentProfile(player)
+                                 ? PROFILEMAN->GetProfile(player)
+                                 : nullptr;
+    if (profile != nullptr && !profile->m_sGuid.empty()) {
+      playerGuid = profile->m_sGuid;
+    }
+  }
+
+  const std::string songHash = song != nullptr ? song->GetSongDir() : "";
+  const std::string chartHash =
+      steps != nullptr ? std::to_string(steps->GetHash()) : "";
+
+  std::string mods;
+  if (GAMESTATE->m_pPlayerState[player] != nullptr) {
+    mods = GAMESTATE->m_pPlayerState[player]
+               ->m_PlayerOptions.GetPreferred()
+               .GetString();
+  }
+  const float musicRate = GAMESTATE->m_SongOptions.GetPreferred().m_fMusicRate;
+  const float lifeRemaining = pss.m_fLifeRemainingSeconds;
+  const float survivalSeconds = pss.GetSurvivalSeconds();
+  const std::string stageAward = StageAwardToString(pss.m_StageAward);
   std::ostringstream songEndPayload;
-  songEndPayload << "{\"song\":{\"title\":\""
+  songEndPayload
+      << "{\"song\":{\"title\":\""
       << PipelineEvents::JsonEscape(song ? song->GetDisplayMainTitle() : "")
-      << "\",\"artist\":\"" << PipelineEvents::JsonEscape(song ? song->GetDisplayArtist() : "")
-      << "\",\"group\":\"" << PipelineEvents::JsonEscape(song ? song->m_sGroupName : "")
+      << "\",\"artist\":\""
+      << PipelineEvents::JsonEscape(song ? song->GetDisplayArtist() : "")
+      << "\",\"group\":\""
+      << PipelineEvents::JsonEscape(song ? song->m_sGroupName : "")
       << "\"},\"chart\":{\"stepsType\":\""
-      << PipelineEvents::JsonEscape(steps ? StepsTypeToString(steps->m_StepsType) : "unknown")
+      << PipelineEvents::JsonEscape(
+             steps ? StepsTypeToString(steps->m_StepsType) : "unknown")
       << "\",\"difficulty\":\""
-      << PipelineEvents::JsonEscape(steps ? DifficultyToString(steps->GetDifficulty()) : "Unknown")
-      << "\",\"meter\":" << (steps ? steps->GetMeter() : 0)
-      << "},\"reason\":\"" << (pss.m_bFailed ? "failed" : "completed")
-      << "\",\"failed\":" << (pss.m_bFailed ? "true" : "false")
-      << "}";
+      << PipelineEvents::JsonEscape(
+             steps ? DifficultyToString(steps->GetDifficulty()) : "Unknown")
+      << "\",\"meter\":" << (steps ? steps->GetMeter() : 0) << "},\"reason\":\""
+      << (pss.m_bFailed ? "failed" : "completed")
+      << "\",\"failed\":" << (pss.m_bFailed ? "true" : "false") << "}";
   PipelineEvents::AppendEvent(
       eventDir, "song_end", songEndPayload.str(), "Pipeline song end");
   std::ostringstream payload;
   payload << "{\"screen\":\"" << PipelineEvents::JsonEscape(screenName)
-      << "\",\"song\":{\"title\":\""
-      << PipelineEvents::JsonEscape(song ? song->GetDisplayMainTitle() : "")
-      << "\",\"artist\":\"" << PipelineEvents::JsonEscape(song ? song->GetDisplayArtist() : "")
-      << "\",\"group\":\"" << PipelineEvents::JsonEscape(song ? song->m_sGroupName : "")
-      << "\"},\"chart\":{\"stepsType\":\""
-      << PipelineEvents::JsonEscape(steps ? StepsTypeToString(steps->m_StepsType) : "unknown")
-      << "\",\"difficulty\":\""
-      << PipelineEvents::JsonEscape(steps ? DifficultyToString(steps->GetDifficulty()) : "Unknown")
-      << "\",\"meter\":" << (steps ? steps->GetMeter() : 0)
-      << "},\"result\":{\"grade\":\"" << PipelineEvents::JsonEscape(GradeToString(finalGrade))
-      << "\",\"score\":" << finalScore
-      << ",\"maxCombo\":" << finalMaxCombo
-      << ",\"actualDancePoints\":" << pss.m_iActualDancePoints
-      << ",\"possibleDancePoints\":" << pss.m_iPossibleDancePoints
-      << ",\"percentDancePoints\":" << pss.GetPercentDancePoints()
-      << ",\"judgments\":{\"w1\":" << pss.m_iTapNoteScores[TNS_W1]
-      << ",\"w2\":" << pss.m_iTapNoteScores[TNS_W2]
-      << ",\"w3\":" << pss.m_iTapNoteScores[TNS_W3]
-      << ",\"w4\":" << pss.m_iTapNoteScores[TNS_W4]
-      << ",\"w5\":" << pss.m_iTapNoteScores[TNS_W5]
-      << ",\"miss\":" << pss.m_iTapNoteScores[TNS_Miss]
-      << "},\"holds\":{\"held\":" << pss.m_iHoldNoteScores[HNS_Held]
-      << ",\"letGo\":" << pss.m_iHoldNoteScores[HNS_LetGo]
-      << ",\"missed\":" << pss.m_iHoldNoteScores[HNS_Missed]
-      << "},\"highScore\":{\"available\":" << (hasFinalHighScore ? "true" : "false")
-      << ",\"grade\":\"" << PipelineEvents::JsonEscape(GradeToString(highScore.GetGrade()))
-      << "\",\"score\":" << highScore.GetScore()
-      << ",\"maxCombo\":" << highScore.GetMaxCombo()
-      << ",\"percentDancePoints\":" << highScore.GetPercentDP()
-      << ",\"judgments\":{\"w1\":" << highScore.GetTapNoteScore(TNS_W1)
-      << ",\"w2\":" << highScore.GetTapNoteScore(TNS_W2)
-      << ",\"w3\":" << highScore.GetTapNoteScore(TNS_W3)
-      << ",\"w4\":" << highScore.GetTapNoteScore(TNS_W4)
-      << ",\"w5\":" << highScore.GetTapNoteScore(TNS_W5)
-      << ",\"miss\":" << highScore.GetTapNoteScore(TNS_Miss)
-      << "},\"holds\":{\"held\":" << highScore.GetHoldNoteScore(HNS_Held)
-      << ",\"letGo\":" << highScore.GetHoldNoteScore(HNS_LetGo)
-      << ",\"missed\":" << highScore.GetHoldNoteScore(HNS_Missed)
-      << "}}"
-      << ",\"failed\":" << (pss.m_bFailed ? "true" : "false")
-      << ",\"disqualified\":" << (pss.IsDisqualified() ? "true" : "false")
-      << "}}";
+          << "\",\"player\":{\"slot\":\""
+          << PipelineEvents::JsonEscape(playerSlot) << "\",\"name\":\""
+          << PipelineEvents::JsonEscape(playerName) << "\",\"guid\":\""
+          << PipelineEvents::JsonEscape(playerGuid)
+          << "\"},\"song\":{\"title\":\""
+          << PipelineEvents::JsonEscape(song ? song->GetDisplayMainTitle() : "")
+          << "\",\"artist\":\""
+          << PipelineEvents::JsonEscape(song ? song->GetDisplayArtist() : "")
+          << "\",\"group\":\""
+          << PipelineEvents::JsonEscape(song ? song->m_sGroupName : "")
+          << "\",\"hash\":\"" << PipelineEvents::JsonEscape(songHash)
+          << "\"},\"chart\":{\"stepsType\":\""
+          << PipelineEvents::JsonEscape(
+                 steps ? StepsTypeToString(steps->m_StepsType) : "unknown")
+          << "\",\"difficulty\":\""
+          << PipelineEvents::JsonEscape(
+                 steps ? DifficultyToString(steps->GetDifficulty()) : "Unknown")
+          << "\",\"meter\":" << (steps ? steps->GetMeter() : 0)
+          << ",\"hash\":\"" << PipelineEvents::JsonEscape(chartHash)
+          << "\"},\"mods\":\"" << PipelineEvents::JsonEscape(mods)
+          << "\",\"musicRate\":" << musicRate
+          << ",\"lifeRemaining\":" << lifeRemaining
+          << ",\"survivalSeconds\":" << survivalSeconds << ",\"stageAward\":\""
+          << PipelineEvents::JsonEscape(stageAward)
+          << "\",\"result\":{\"grade\":\""
+          << PipelineEvents::JsonEscape(GradeToString(finalGrade))
+          << "\",\"score\":" << finalScore << ",\"maxCombo\":" << finalMaxCombo
+          << ",\"actualDancePoints\":" << pss.m_iActualDancePoints
+          << ",\"possibleDancePoints\":" << pss.m_iPossibleDancePoints
+          << ",\"percentDancePoints\":" << pss.GetPercentDancePoints()
+          << ",\"judgments\":{\"w1\":" << pss.m_iTapNoteScores[TNS_W1]
+          << ",\"w2\":" << pss.m_iTapNoteScores[TNS_W2]
+          << ",\"w3\":" << pss.m_iTapNoteScores[TNS_W3]
+          << ",\"w4\":" << pss.m_iTapNoteScores[TNS_W4]
+          << ",\"w5\":" << pss.m_iTapNoteScores[TNS_W5]
+          << ",\"miss\":" << pss.m_iTapNoteScores[TNS_Miss]
+          << "},\"holds\":{\"held\":" << pss.m_iHoldNoteScores[HNS_Held]
+          << ",\"letGo\":" << pss.m_iHoldNoteScores[HNS_LetGo]
+          << ",\"missed\":" << pss.m_iHoldNoteScores[HNS_Missed]
+          << "},\"highScore\":{\"available\":"
+          << (hasFinalHighScore ? "true" : "false") << ",\"grade\":\""
+          << PipelineEvents::JsonEscape(GradeToString(highScore.GetGrade()))
+          << "\",\"score\":" << highScore.GetScore()
+          << ",\"maxCombo\":" << highScore.GetMaxCombo()
+          << ",\"percentDancePoints\":" << highScore.GetPercentDP()
+          << ",\"judgments\":{\"w1\":" << highScore.GetTapNoteScore(TNS_W1)
+          << ",\"w2\":" << highScore.GetTapNoteScore(TNS_W2)
+          << ",\"w3\":" << highScore.GetTapNoteScore(TNS_W3)
+          << ",\"w4\":" << highScore.GetTapNoteScore(TNS_W4)
+          << ",\"w5\":" << highScore.GetTapNoteScore(TNS_W5)
+          << ",\"miss\":" << highScore.GetTapNoteScore(TNS_Miss)
+          << "},\"holds\":{\"held\":" << highScore.GetHoldNoteScore(HNS_Held)
+          << ",\"letGo\":" << highScore.GetHoldNoteScore(HNS_LetGo)
+          << ",\"missed\":" << highScore.GetHoldNoteScore(HNS_Missed) << "}}"
+          << ",\"failed\":" << (pss.m_bFailed ? "true" : "false")
+          << ",\"disqualified\":" << (pss.IsDisqualified() ? "true" : "false")
+          << "}}";
   PipelineEvents::AppendEvent(
       eventDir, "stage_result", payload.str(), "Pipeline stage result");
 }
