@@ -126,6 +126,33 @@ void EmitPipelineStageResult(const std::string& screenName, StageStats* stats) {
   const unsigned int finalScore = hasFinalHighScore ? highScore.GetScore() : pss.m_iScore;
   const unsigned int finalMaxCombo = hasFinalHighScore ? highScore.GetMaxCombo() : pss.GetMaxCombo().m_cnt;
   const Grade finalGrade = hasFinalHighScore ? highScore.GetGrade() : pss.GetGrade();
+
+  const std::string playerSlot = PlayerNumberToString(player);
+  std::string playerName = playerSlot;
+  std::string playerGuid = playerSlot;
+  if (PROFILEMAN != nullptr) {
+    const std::string profileName = PROFILEMAN->GetPlayerName(player);
+    if (!profileName.empty()) {
+      playerName = profileName;
+    }
+    const Profile* profile = PROFILEMAN->GetProfile(player);
+    if (profile != nullptr && !profile->m_sGuid.empty()) {
+      playerGuid = profile->m_sGuid;
+    }
+  }
+
+  const std::string songHash = song != nullptr ? song->GetSongDir() : "";
+  const std::string chartHash =
+      steps != nullptr ? std::to_string(steps->GetHash()) : "";
+
+  std::string mods;
+  if (GAMESTATE->m_pPlayerState[player] != nullptr) {
+    mods = GAMESTATE->m_pPlayerState[player]->m_PlayerOptions.GetPreferred().GetString();
+  }
+  const float musicRate = GAMESTATE->m_SongOptions.GetPreferred().m_fMusicRate;
+  const float lifeRemaining = pss.m_fLifeRemainingSeconds;
+  const float survivalSeconds = pss.GetSurvivalSeconds();
+  const std::string stageAward = StageAwardToString(pss.m_StageAward);
   std::ostringstream songEndPayload;
   songEndPayload << "{\"song\":{\"title\":\""
       << PipelineEvents::JsonEscape(song ? song->GetDisplayMainTitle() : "")
@@ -143,16 +170,26 @@ void EmitPipelineStageResult(const std::string& screenName, StageStats* stats) {
       eventDir, "song_end", songEndPayload.str(), "Pipeline song end");
   std::ostringstream payload;
   payload << "{\"screen\":\"" << PipelineEvents::JsonEscape(screenName)
-      << "\",\"song\":{\"title\":\""
+      << "\",\"player\":{\"slot\":\"" << PipelineEvents::JsonEscape(playerSlot)
+      << "\",\"name\":\"" << PipelineEvents::JsonEscape(playerName)
+      << "\",\"guid\":\"" << PipelineEvents::JsonEscape(playerGuid)
+      << "\"},\"song\":{\"title\":\""
       << PipelineEvents::JsonEscape(song ? song->GetDisplayMainTitle() : "")
       << "\",\"artist\":\"" << PipelineEvents::JsonEscape(song ? song->GetDisplayArtist() : "")
       << "\",\"group\":\"" << PipelineEvents::JsonEscape(song ? song->m_sGroupName : "")
+      << "\",\"hash\":\"" << PipelineEvents::JsonEscape(songHash)
       << "\"},\"chart\":{\"stepsType\":\""
       << PipelineEvents::JsonEscape(steps ? StepsTypeToString(steps->m_StepsType) : "unknown")
       << "\",\"difficulty\":\""
       << PipelineEvents::JsonEscape(steps ? DifficultyToString(steps->GetDifficulty()) : "Unknown")
       << "\",\"meter\":" << (steps ? steps->GetMeter() : 0)
-      << "},\"result\":{\"grade\":\"" << PipelineEvents::JsonEscape(GradeToString(finalGrade))
+      << ",\"hash\":\"" << PipelineEvents::JsonEscape(chartHash)
+      << "\"},\"mods\":\"" << PipelineEvents::JsonEscape(mods)
+      << "\",\"musicRate\":" << musicRate
+      << ",\"lifeRemaining\":" << lifeRemaining
+      << ",\"survivalSeconds\":" << survivalSeconds
+      << ",\"stageAward\":\"" << PipelineEvents::JsonEscape(stageAward)
+      << "\",\"result\":{\"grade\":\"" << PipelineEvents::JsonEscape(GradeToString(finalGrade))
       << "\",\"score\":" << finalScore
       << ",\"maxCombo\":" << finalMaxCombo
       << ",\"actualDancePoints\":" << pss.m_iActualDancePoints
