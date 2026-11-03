@@ -138,7 +138,11 @@ void EmitPipelineStageResult(const std::string& screenName, StageStats* stats) {
     if (!profileName.empty()) {
       playerName = profileName;
     }
-    const Profile* profile = PROFILEMAN->GetProfile(player);
+    // GetProfile() returns a placeholder profile with a random GUID when no
+    // profile is loaded, so only use it for persistent (loaded) profiles.
+    const Profile* profile = PROFILEMAN->IsPersistentProfile(player)
+                                 ? PROFILEMAN->GetProfile(player)
+                                 : nullptr;
     if (profile != nullptr && !profile->m_sGuid.empty()) {
       playerGuid = profile->m_sGuid;
     }
