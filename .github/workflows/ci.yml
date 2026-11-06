@@ -28,13 +28,26 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          submodules: recursive
+          submodules: false
+      - name: Fetch extern submodules
+        run: git submodule update --init --depth 1 --jobs 8 -- extern/IXWebSocket extern/mbedtls extern/zlib extern/ffmpeg extern/ogg extern/vorbis extern/libtommath extern/libtomcrypt extern/libusb extern/hidapi extern/stb
+        shell: bash
       - name: Install dependencies
         uses: ./.github/actions/setup-env
         with:
           os: ${{ matrix.os }}
           ccache: 'true'
+      - name: Setup MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
       - name: Configure
         run: cmake -B build -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache ${{ env.CMAKE_FLAGS }}
       - name: Build
         run: cmake --build build ${{ env.CMAKE_BUILD_FLAGS }}
+      - name: ccache stats
+        if: always()
+        continue-on-error: true
+        run: ccache -s
+        shell: bash

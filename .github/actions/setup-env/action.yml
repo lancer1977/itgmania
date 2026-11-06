@@ -37,6 +37,9 @@ runs:
         if [ "${{ inputs.ccache }}" = "true" ]; then
           choco install ccache
         fi
+        if ! command -v ninja >/dev/null 2>&1; then
+          choco install ninja -y
+        fi
       shell: bash
 
     - name: ccache
@@ -91,4 +94,5 @@ runs:
       run: |
         echo "CMAKE_BUILD_FLAGS=--parallel $env:NUMBER_OF_PROCESSORS" >> $env:GITHUB_ENV
         echo "ARTIFACT_PATH=build/ITGmania-*.exe" >> $env:GITHUB_ENV
+        echo "CMAKE_FLAGS=-G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded -DCMAKE_POLICY_DEFAULT_CMP0141=NEW" >> $env:GITHUB_ENV
       shell: pwsh
